@@ -1,0 +1,6 @@
+{
+  "name": "Recursive Research Swarm",
+  "description": "Multi-agent research council with bounded autonomy, structured claim corroboration, short-lived laborers, and live channel deliberation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

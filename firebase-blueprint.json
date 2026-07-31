@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "SwarmSession": {
+      "title": "SwarmSession",
+      "description": "Multi-agent research deliberation session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "topic": { "type": "string" },
+        "currentRound": { "type": "number" },
+        "totalRounds": { "type": "number" },
+        "phase": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "topic", "phase"]
+    },
+    "Claim": {
+      "title": "Claim",
+      "description": "Research claim posted by specialist agents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "statement": { "type": "string" },
+        "agentRole": { "type": "string" },
+        "agentName": { "type": "string" },
+        "status": { "type": "string" },
+        "confidence": { "type": "number" }
+      },
+      "required": ["id", "statement", "agentRole"]
+    }
+  },
+  "firestore": {
+    "/swarm_sessions/{sessionId}": {
+      "schema": "SwarmSession",
+      "description": "Active and archived swarm deliberation sessions"
+    },
+    "/swarm_sessions/{sessionId}/claims/{claimId}": {
+      "schema": "Claim",
+      "description": "Individual claims generated within a session"
+    }
+  }
+}
