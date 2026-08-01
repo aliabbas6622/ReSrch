@@ -6,6 +6,7 @@
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: #F9F8F6;
     color: #1A1A1A;
+    min-width: 320px;
   }
 
   h1, h2, h3, .font-serif {
@@ -15,6 +16,20 @@
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid #D43F3F;
+  outline-offset: 2px;
 }
 
 /* Custom Editorial Styling Utilities */

@@ -32,6 +32,7 @@ import {
   SpecialistRole,
 } from './types';
 import { PRESET_TOPICS, DEFAULT_CONFIG } from './data/presets';
+import { navigateToPage, pageFromLocation } from './lib/routes';
 import {
   BrainCircuit,
   Sparkles,
@@ -56,7 +57,7 @@ export default function App() {
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [isAutoRunning, setIsAutoRunning] = useState(false);
   const [activeTab, setActiveTab] = useState<'room' | 'graph' | 'ledger' | 'report'>('room');
-  const [activeMainPage, setActiveMainPage] = useState<MainPage>('topic');
+  const [activeMainPage, setActiveMainPage] = useState<MainPage>(() => pageFromLocation());
   const [config, setConfig] = useState<SwarmConfig>(DEFAULT_CONFIG);
 
   // Firebase Auth & Firestore State
@@ -68,6 +69,15 @@ export default function App() {
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [appError, setAppError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncRoute = () => setActiveMainPage(pageFromLocation());
+    window.addEventListener('popstate', syncRoute);
+    return () => window.removeEventListener('popstate', syncRoute);
+  }, []);
+
+  const selectMainPage = (page: MainPage) => navigateToPage(page);
 
   // Subscribe to Firebase Auth
   useEffect(() => {
@@ -125,6 +135,7 @@ export default function App() {
     if (!queryTopic.trim()) return;
     setIsInitializing(true);
     setIsAutoRunning(false);
+    setAppError(null);
 
     try {
       const res = await fetch('/api/swarm/init', {
@@ -140,11 +151,12 @@ export default function App() {
       const data: SwarmSession = await res.json();
       setSession(data);
       setActiveTab('room');
-      setActiveMainPage('swarm');
+      navigateToPage('swarm');
       // Save to Firestore
       saveSwarmSessionToFirestore(data, user?.uid);
     } catch (err) {
       console.error('Error initializing swarm:', err);
+      setAppError(err instanceof Error ? err.message : 'The research council could not be initialized.');
     } finally {
       setIsInitializing(false);
     }
@@ -154,6 +166,7 @@ export default function App() {
   const handleStepSwarm = async () => {
     if (!session || isStepping || session.phase === 'completed') return;
     setIsStepping(true);
+    setAppError(null);
 
     try {
       const res = await fetch('/api/swarm/step', {
@@ -172,6 +185,7 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error stepping swarm:', err);
+      setAppError(err instanceof Error ? err.message : 'The swarm could not advance.');
       setIsAutoRunning(false);
     } finally {
       setIsStepping(false);
@@ -198,7 +212,7 @@ export default function App() {
 
       if (data.session) {
         setSession(data.session);
-        setActiveMainPage('swarm');
+        navigateToPage('swarm');
         setActiveTab('room');
       } else if (session && data.reply) {
         setSession((prev) => {
@@ -214,6 +228,7 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error chatting with orchestrator:', err);
+      setAppError(err instanceof Error ? err.message : 'The orchestrator is temporarily unavailable.');
     } finally {
       setIsSendingChat(false);
     }
@@ -383,7 +398,7 @@ export default function App() {
     setIsAutoRunning(false);
     setSession(null);
     setTopicInput('');
-    setActiveMainPage('topic');
+    navigateToPage('topic');
   };
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -419,21 +434,28 @@ export default function App() {
         onSelectPreset={handleSelectPreset}
         onOpenConfig={() => setShowConfigModal(true)}
         onExportReport={() => {
-          setActiveMainPage('swarm');
+          navigateToPage('swarm');
           setActiveTab('report');
         }}
         isStepping={isStepping}
         activeMainPage={activeMainPage}
-        onSelectMainPage={setActiveMainPage}
+        onSelectMainPage={selectMainPage}
         user={user}
         onSignInGoogle={signInWithGoogle}
         onSignInAnonymous={signInAnonymouslyUser}
         onSignOut={logoutUser}
         savedSessions={savedSessions}
-        onLoadSession={(s) => setSession(s)}
+        onLoadSession={(s) => { setSession(s); navigateToPage('swarm'); }}
         onDeleteSession={handleDeleteSession}
         isSyncing={isSyncing}
       />
+
+      {appError && (
+        <div role="alert" className="mx-auto mt-4 flex w-[calc(100%-2rem)] max-w-7xl items-center justify-between gap-4 border border-[#D43F3F] bg-red-50 px-4 py-3 text-sm text-red-900">
+          <span><strong>Request failed.</strong> {appError}</span>
+          <button onClick={() => setAppError(null)} className="min-h-9 border border-red-300 px-3 font-mono text-xs font-bold uppercase hover:bg-white">Dismiss</button>
+        </div>
+      )}
 
       {/* Main Body */}
       <main className="flex-1 mx-auto w-full max-w-7xl p-4 sm:p-6 space-y-6 pb-24">

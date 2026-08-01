@@ -183,7 +183,6 @@ export const ResearchTopicExplorer: React.FC<ResearchTopicExplorerProps> = ({
                 onClick={() => {
                   setSelectedPreset(preset);
                   setCustomTopic(preset.prompt);
-                  onSelectPreset(preset.id);
                 }}
                 className={`p-4 border transition-all cursor-pointer ${
                   selectedPreset.id === preset.id

@@ -111,7 +111,12 @@ export async function logoutUser() {
 
 // Firestore Sync Helpers
 export async function saveSwarmSessionToFirestore(session: SwarmSession, userId?: string) {
-  const collectionPath = userId ? `users/${userId}/swarm_sessions` : 'swarm_sessions';
+  if (!userId) {
+    const sessions = await fetchUserSwarmSessions();
+    localStorage.setItem('research-swarm:sessions', JSON.stringify([session, ...sessions.filter((item) => item.id !== session.id)].slice(0, 20)));
+    return true;
+  }
+  const collectionPath = `users/${userId}/swarm_sessions`;
   const docPath = `${collectionPath}/${session.id}`;
   try {
     const docRef = doc(db, collectionPath, session.id);
@@ -128,7 +133,15 @@ export async function saveSwarmSessionToFirestore(session: SwarmSession, userId?
 }
 
 export async function fetchUserSwarmSessions(userId?: string): Promise<SwarmSession[]> {
-  const collectionPath = userId ? `users/${userId}/swarm_sessions` : 'swarm_sessions';
+  if (!userId) {
+    try {
+      return JSON.parse(localStorage.getItem('research-swarm:sessions') || '[]') as SwarmSession[];
+    } catch {
+      localStorage.removeItem('research-swarm:sessions');
+      return [];
+    }
+  }
+  const collectionPath = `users/${userId}/swarm_sessions`;
   try {
     const colRef = collection(db, collectionPath);
     const snapshot = await getDocs(colRef);
@@ -145,7 +158,12 @@ export async function fetchUserSwarmSessions(userId?: string): Promise<SwarmSess
 }
 
 export async function deleteSwarmSessionFromFirestore(sessionId: string, userId?: string) {
-  const collectionPath = userId ? `users/${userId}/swarm_sessions` : 'swarm_sessions';
+  if (!userId) {
+    const sessions = await fetchUserSwarmSessions();
+    localStorage.setItem('research-swarm:sessions', JSON.stringify(sessions.filter((session) => session.id !== sessionId)));
+    return true;
+  }
+  const collectionPath = `users/${userId}/swarm_sessions`;
   const docPath = `${collectionPath}/${sessionId}`;
   try {
     await deleteDoc(doc(db, collectionPath, sessionId));
@@ -170,4 +188,3 @@ async function testConnection() {
 }
 
 testConnection();
-
