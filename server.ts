@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import {
@@ -20,9 +21,56 @@ import { SPECIALIST_META, DEFAULT_CONFIG } from './src/data/presets';
 dotenv.config();
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+app.disable('x-powered-by');
+app.use(express.json({ limit: '2mb' }));
+
+const RATE_WINDOW_MS = 60_000;
+const RATE_LIMIT = 90;
+const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+
+app.use((req, res, next) => {
+  const requestId = req.header('x-request-id')?.slice(0, 80) || crypto.randomUUID();
+  res.setHeader('x-request-id', requestId);
+  res.setHeader('x-content-type-options', 'nosniff');
+  res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
+  res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()');
+
+  if (!req.path.startsWith('/api/')) return next();
+  const key = req.ip || 'unknown';
+  const now = Date.now();
+  const bucket = requestBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    requestBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return next();
+  }
+  bucket.count += 1;
+  res.setHeader('x-ratelimit-remaining', Math.max(0, RATE_LIMIT - bucket.count));
+  if (bucket.count > RATE_LIMIT) {
+    return res.status(429).json({ error: 'Too many requests. Please retry shortly.', requestId });
+  }
+  next();
+});
 
 const PORT = 3000;
+
+const cleanText = (value: unknown, maxLength: number) =>
+  typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+
+const VALID_PHASES: SwarmPhase[] = ['idle', 'scoping', 'parallel_research', 'cross_examination', 'convergence_check', 'synthesis', 'completed'];
+
+function isValidSession(value: unknown): value is SwarmSession {
+  if (!value || typeof value !== 'object') return false;
+  const session = value as Partial<SwarmSession>;
+  return Boolean(
+    cleanText(session.id, 160) &&
+    cleanText(session.topic, 2_000) &&
+    session.phase && VALID_PHASES.includes(session.phase) &&
+    Array.isArray(session.agents) && session.agents.length <= 30 &&
+    Array.isArray(session.claims) && session.claims.length <= 500 &&
+    Array.isArray(session.messages) && session.messages.length <= 2_000 &&
+    Array.isArray(session.logs) && session.logs.length <= 2_000
+  );
+}
 
 // Initialize Gemini Client
 const getGeminiAI = () => {
@@ -42,6 +90,8 @@ const getGeminiAI = () => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
+    service: 'research-swarm-api',
+    version: process.env.npm_package_version || '0.0.0',
     geminiAvailable: !!process.env.GEMINI_API_KEY,
     timestamp: new Date().toISOString(),
   });
@@ -74,15 +124,21 @@ async function callGemini(prompt: string, systemInstruction?: string) {
 // Initialize a new Swarm Session
 app.post('/api/swarm/init', async (req, res) => {
   try {
-    const { topic, config: customConfig } = req.body;
-    if (!topic || typeof topic !== 'string') {
-      return res.status(400).json({ error: 'Topic is required.' });
+    const topic = cleanText(req.body?.topic, 2_000);
+    const customConfig = req.body?.config;
+    if (topic.length < 8) {
+      return res.status(400).json({ error: 'Topic must contain at least 8 characters.' });
     }
 
     const config: SwarmConfig = {
       ...DEFAULT_CONFIG,
-      ...customConfig,
+      ...(customConfig && typeof customConfig === 'object' ? customConfig : {}),
     };
+    config.maxDebateRounds = Math.min(8, Math.max(1, Number(config.maxDebateRounds) || DEFAULT_CONFIG.maxDebateRounds));
+    config.maxLaborersPerSpecialist = Math.min(10, Math.max(0, Number(config.maxLaborersPerSpecialist) || DEFAULT_CONFIG.maxLaborersPerSpecialist));
+    config.selectedRoles = Array.isArray(config.selectedRoles)
+      ? config.selectedRoles.filter((role): role is SpecialistRole => role in SPECIALIST_META)
+      : DEFAULT_CONFIG.selectedRoles;
 
     const activeRoles: SpecialistRole[] =
       config.selectedRoles && config.selectedRoles.length > 0
@@ -219,8 +275,8 @@ Respond in clear JSON format with keys: "angles" (array of strings), "briefs" (o
 app.post('/api/swarm/step', async (req, res) => {
   try {
     const { session } = req.body as { session: SwarmSession };
-    if (!session) {
-      return res.status(400).json({ error: 'Session object required.' });
+    if (!isValidSession(session)) {
+      return res.status(400).json({ error: 'A valid, bounded session object is required.' });
     }
 
     const updatedSession = { ...session };
@@ -626,7 +682,15 @@ Generate a comprehensive publication-grade research synthesis report in JSON for
 // Single Laborer Trigger API
 app.post('/api/swarm/laborer', async (req, res) => {
   try {
-    const { parentAgentId, parentAgentName, taskType, description, topic } = req.body;
+    const parentAgentId = cleanText(req.body?.parentAgentId, 160);
+    const parentAgentName = cleanText(req.body?.parentAgentName, 160);
+    const taskType = cleanText(req.body?.taskType, 40);
+    const description = cleanText(req.body?.description, 2_000);
+    const topic = cleanText(req.body?.topic, 2_000);
+    const validTaskTypes = ['calculation', 'citation_verify', 'source_fetch', 'translation', 'fact_check'];
+    if (description.length < 4 || !validTaskTypes.includes(taskType)) {
+      return res.status(400).json({ error: 'A valid task type and description are required.' });
+    }
 
     const prompt = `Topic: "${topic || 'Research query'}"
 Task Type: ${taskType}
@@ -659,7 +723,7 @@ Format output as JSON: { "result": string, "confidence": "high" }`;
       id: `lab-manual-${Date.now()}`,
       parentAgentId: parentAgentId || 'agent-tier2-frontier_research',
       parentAgentName: parentAgentName || 'Frontier Researcher',
-      taskType: taskType || 'fact_check',
+      taskType: taskType as LaborerTask['taskType'],
       description,
       result,
       status: 'completed',
@@ -677,9 +741,13 @@ Format output as JSON: { "result": string, "confidence": "high" }`;
 // Direct Orchestrator Chat Endpoint
 app.post('/api/swarm/orchestrator-chat', async (req, res) => {
   try {
-    const { session, message } = req.body as { session?: SwarmSession; message: string };
-    if (!message || typeof message !== 'string') {
+    const session = req.body?.session as SwarmSession | undefined;
+    const message = cleanText(req.body?.message, 4_000);
+    if (!message) {
       return res.status(400).json({ error: 'Message text is required.' });
+    }
+    if (session && !isValidSession(session)) {
+      return res.status(400).json({ error: 'The attached session is invalid or exceeds safety limits.' });
     }
 
     const now = Date.now();

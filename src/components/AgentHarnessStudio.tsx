@@ -127,7 +127,7 @@ export const AgentHarnessStudio: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A]/70 mb-1">
               <Cpu className="h-4 w-4 text-[#D43F3F]" />
-              LANGCHAIN BLOG ARCHITECTURE SPECIFICATION
+              PRODUCTION AGENT HARNESS SPECIFICATION
             </div>
             <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#1A1A1A]">
               The Anatomy of an Agent Harness
@@ -404,7 +404,7 @@ export const AgentHarnessStudio: React.FC = () => {
               <div className="space-y-2 text-xs font-sans text-[#1A1A1A]/80">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-[#2A6F47]" />
-                  <span>Schema validation via Zod / JSON Schema</span>
+                  <span>Runtime schema gates on every API boundary</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-[#2A6F47]" />

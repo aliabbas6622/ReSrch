@@ -14,6 +14,7 @@ import {
   Sigma,
   FileText,
   Cpu,
+  Workflow,
   HelpCircle,
   UserPlus,
   Cloud,
@@ -104,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="sticky top-0 z-30 border-b border-[#1A1A1A]/20 bg-[#F9F8F6] px-4 py-3 text-[#1A1A1A]">
       {/* Editorial Top Utility Bar */}
       <div className="mx-auto flex max-w-7xl items-center justify-between border-b border-[#1A1A1A]/10 pb-2 mb-2 text-[10px] font-mono uppercase tracking-widest text-[#1A1A1A]/60">
-        <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-3">
           <span>OPENHARNESS MULTI-AGENT SPECIFICATION</span>
           <span className="hidden sm:inline">•</span>
           <span className="hidden sm:inline">DYNAMIC ORCHESTRATOR SPAWNER</span>
@@ -207,12 +208,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onSelectMainPage('markdown')}
               className={`flex items-center gap-1.5 px-3 py-1.5 border transition-all duration-200 ${
                 activeMainPage === 'markdown'
-                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-[#1A1A1A]'
+                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
                   : 'border-transparent text-[#1A1A1A]/70 hover:border-[#1A1A1A] hover:bg-[#F2F0EB]'
               }`}
             >
               <FileText className="h-3.5 w-3.5 text-[#B45309]" />
               <span>05. Markdown</span>
+            </button>
+
+            <button
+              onClick={() => onSelectMainPage('harness')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border transition-all duration-200 ${
+                activeMainPage === 'harness'
+                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                  : 'border-transparent text-[#1A1A1A]/70 hover:border-[#1A1A1A] hover:bg-[#F2F0EB]'
+              }`}
+            >
+              <Workflow className="h-3.5 w-3.5 text-[#0284c7]" />
+              <span>06. Harness</span>
             </button>
           </div>
         </div>
@@ -492,7 +505,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Mobile Bar Selector */}
-      <div className="flex lg:hidden items-center justify-around border-t border-[#1A1A1A]/10 mt-2 pt-2 font-mono text-[10px] font-semibold uppercase tracking-wider">
+      <div className="flex lg:hidden items-center gap-2 overflow-x-auto border-t border-[#1A1A1A]/10 mt-2 pt-2 pb-1 font-mono text-[10px] font-semibold uppercase tracking-wider">
         <button
           onClick={() => onSelectMainPage('topic')}
           className={`px-2 py-1 ${activeMainPage === 'topic' ? 'text-[#D43F3F] font-bold underline' : 'text-[#1A1A1A]/70'}`}
